@@ -1,0 +1,6 @@
+.env
+.env.*
+!.env.example
+
+/nginx/certs/*
+!/nginx/certs/README.md
