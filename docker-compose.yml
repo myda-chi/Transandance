@@ -1,0 +1,184 @@
+services:
+  # ================================================
+  # Database
+  # ================================================
+  postgres:
+    image: postgres:17-alpine
+    container_name: transcendence-postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+    networks:
+      - database
+
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  migration:
+    build:
+      context: .
+      dockerfile: backend/migration/Dockerfile
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${POSTGRES_DB}
+
+      DB_ADMIN_USER: ${POSTGRES_USER}
+      DB_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
+
+      IDENTITY_DB_URL: ${IDENTITY_DB_URL}
+      CONTENT_DB_URL: ${CONTENT_DB_URL}
+      GAME_DB_URL: ${GAME_DB_URL}
+
+    networks:
+      - database
+
+  # ==========================================
+  # BACKEND SERVICES
+  # ==========================================
+
+  identity:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: identity
+
+    container_name: transcendence-identity
+    restart: unless-stopped
+
+    environment:
+      PORT: 8081
+      DATABASE_URL: "postgres://${IDENTITY_DB_USER}:${IDENTITY_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?search_path=${IDENTITY_DB_SCHEMA}"
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      ACCESS_TOKEN_TTL: ${ACCESS_TOKEN_TTL}
+      REFRESH_TOKEN_TTL: ${REFRESH_TOKEN_TTL}
+      APP_ORIGIN: ${APP_ORIGIN}
+
+    expose:
+      - "8081"
+
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
+    networks:
+      - application
+      - database
+
+  content:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: content
+
+    container_name: transcendence-content
+    restart: unless-stopped
+
+    environment:
+      PORT: 8082
+      DATABASE_URL: "postgres://${CONTENT_DB_USER}:${CONTENT_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?search_path=${CONTENT_DB_SCHEMA}"
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+
+    expose:
+      - "8082"
+
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
+    networks:
+      - application
+      - database
+
+
+  game:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+      args:
+        SERVICE: game
+
+    container_name: transcendence-game
+    restart: unless-stopped
+
+    environment:
+      PORT: 8083
+      DATABASE_URL: "postgres://${GAME_DB_USER}:${GAME_DB_PASSWORD}@postgres:5432/${POSTGRES_DB}?search_path=${GAME_DB_SCHEMA}"
+      JWT_SECRET: ${JWT_SECRET}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN}
+      IDENTITY_INTERNAL_URL: http://identity:8081
+      CONTENT_INTERNAL_URL: http://content:8082
+
+    expose:
+      - "8083"
+
+    depends_on:
+      migration:
+        condition: service_completed_successfully
+
+    networks:
+      - application
+      - database
+
+  # ==========================================
+  # FRONTEND / GATEWAY
+  # ==========================================
+
+  nginx:
+    image: nginx:1.30.6-alpine
+    container_name: transcendence-nginx
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+      - "443:443"
+
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+    depends_on:
+      - identity
+      - content
+      - game
+
+    networks:
+      - application
+
+
+# ==========================================
+# NETWORKS
+# ==========================================
+
+networks:
+  application:
+    driver: bridge
+
+  database:
+    driver: bridge
+
+# ==========================================
+# VOLUMES
+# ==========================================
+
+volumes:
+  postgres_data:
