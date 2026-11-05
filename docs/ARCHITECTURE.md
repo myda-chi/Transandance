@@ -629,7 +629,7 @@ These need team decisions (section 15). Defaults to start with:
 | `migrate` | golang-migrate, runs once then exits | — | No |
 
 - **One command:** `make up` runs `docker compose up --build`. It must work on a **fresh clone** after `cp .env.example .env`.
-- An init SQL script (mounted into `postgres`) creates the three schemas and one database user per service, each allowed only its own schema.
+- The `migration` container owns database initialization: it creates the three schemas and one database user per service, each allowed only its own schema.
 - Services wait for Postgres to be healthy (Compose `healthcheck` + `depends_on: condition: service_healthy`).
 - The backend `Dockerfile` is **multi-stage**: stage 1 compiles the Go program, stage 2 copies only the binary into a tiny image.
 - Avatar uploads (standard user management module) are stored in a named volume owned by Identity, with type and size validation.
