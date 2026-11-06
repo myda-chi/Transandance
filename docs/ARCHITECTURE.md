@@ -246,12 +246,17 @@ transcendence/
 │   │   ├── identity/            # Identity's own code (only used by cmd/identity)
 │   │   ├── content/             # Content's own code
 │   │   └── game/                # Game's own code (incl. websocket hub)
-│   ├── migrations/
-│   │   ├── identity/            # 000001_create_users.up.sql / .down.sql ...
-│   │   ├── content/
-│   │   └── game/
 │   ├── seeds/                   # islands, levels, questions (JSON) + loader
 │   └── Dockerfile               # multi-stage; builds one service via a build arg
+│
+├── migration/                   # dedicated migration container
+│   ├── Dockerfile
+│   ├── run_migrations.sh
+│   └── migrations/
+│       ├── identity/
+│       ├── content/
+│       ├── game/
+│       └── init/
 │
 └── frontend/
     ├── package.json
