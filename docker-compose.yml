@@ -155,15 +155,34 @@ services:
 
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - frontend_dist:/usr/share/nginx/html:ro
 
     depends_on:
-      - identity
-      - content
-      - game
+      frontend-build:
+        condition: service_completed_successfully
+      identity:
+        condition: service_started
+      content:
+        condition: service_started
+      game:
+        condition: service_started
 
     networks:
       - application
 
+  # ==========================================
+  # FRONTEND BUILD
+  # ==========================================
+  frontend-build:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+
+    container_name: transcendence-frontend-build
+    restart: "no"
+
+    volumes:
+      - frontend_dist:/output
 
 # ==========================================
 # NETWORKS
@@ -182,3 +201,4 @@ networks:
 
 volumes:
   postgres_data:
+  frontend_dist:
