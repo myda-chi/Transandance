@@ -1,9 +1,7 @@
 CREATE TABLE identity.parent_child (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-
     parent_user_id UUID NOT NULL,
     child_user_id UUID NOT NULL,
-
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT parent_child_parent_fk

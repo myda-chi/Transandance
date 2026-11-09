@@ -1,5 +1,3 @@
-CREATE SCHEMA IF NOT EXISTS identity;
-
 CREATE TABLE identity.users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     role VARCHAR(10) NOT NULL,
