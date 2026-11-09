@@ -135,6 +135,9 @@ Missing any of these means **rejection**, regardless of modules.
 ### 4.1 The big picture
 
 ```
+Frontend build (one-shot) ──writes──▶ Shared static-file volume
+                                      (mounted read-only by Nginx)
+
                            ┌──────────────────────────────┐
                            │   Browser (Chrome)           │
                            │   React + TS + Tailwind      │
@@ -142,7 +145,7 @@ Missing any of these means **rejection**, regardless of modules.
                                           │  HTTPS + WSS (only public entry)
                                           ▼
                            ┌──────────────────────────────┐
-                           │   Nginx (reverse proxy)      │
+                           │   Nginx (official image)     │
                            │   TLS, routing, static files │
                            └──┬──────────┬─────────┬──────┘
              /api/identity/*  │          │         │  /api/game/*  and  /ws
@@ -162,8 +165,15 @@ Missing any of these means **rejection**, regardless of modules.
                    └────────────────────────────────────────────────┘
 ```
 
+- **Frontend build and serving are separate responsibilities.** A one-shot
+  frontend container builds the static files and exits; it does not serve
+  requests. It writes the output to a shared volume that Nginx mounts
+  read-only.
 - **Only Nginx is public.** The services and the database live on the private Docker network.
-- **Nginx acts as the gateway:** it terminates HTTPS, serves the built frontend, routes `/api/<service>/...` to the right service, and upgrades `/ws` to a WebSocket for the Game service.
+- **Nginx uses the official image** with our configuration and the built frontend
+  volume. It terminates HTTPS, serves the static frontend, routes
+  `/api/<service>/...` to the right service, and upgrades `/ws` to a WebSocket
+  for the Game service. It does not build the frontend.
 - **Authentication** is checked inside each service by a shared Go middleware (section 6.5). The gateway is not the only line of defence.
 
 ### 4.2 The services
@@ -257,7 +267,7 @@ transcendence/
     ├── package.json
     ├── vite.config.ts
     ├── tailwind.config.ts
-    ├── Dockerfile               # builds static files for Nginx
+    ├── Dockerfile               # one-shot build; writes static files for Nginx
     └── src/
         ├── app/                 # router, providers, layout (header, footer)
         ├── pages/               # one folder per screen (section 9.2)
@@ -621,7 +631,8 @@ These need team decisions (section 15). Defaults to start with:
 
 | Container | Image / build | Port (internal) | Public? |
 |---|---|---|---|
-| `nginx` | nginx + our config + built frontend files | 443 (and 80 → redirect) | **Yes, the only one** |
+| `frontend-build` | `frontend/Dockerfile`; writes built files to the shared frontend volume, then exits | — | No |
+| `nginx` | Official Nginx image + our config; mounts the frontend volume read-only | 80, 443 | **Yes, the only one** |
 | `identity` | `backend/Dockerfile`, `SERVICE=identity` | 8081 | No |
 | `content` | `backend/Dockerfile`, `SERVICE=content` | 8082 | No |
 | `game` | `backend/Dockerfile`, `SERVICE=game` | 8083 | No |
@@ -629,7 +640,9 @@ These need team decisions (section 15). Defaults to start with:
 | `migrate` | golang-migrate, runs once then exits | — | No |
 
 - **One command:** `make up` runs `docker compose up --build`. It must work on a **fresh clone** after `cp .env.example .env`.
-- An init SQL script (mounted into `postgres`) creates the three schemas and one database user per service, each allowed only its own schema.
+- The one-shot `frontend-build` container builds the React app into a shared volume and exits. Nginx starts after the build succeeds and mounts the built files read-only at `/usr/share/nginx/html`.
+- Nginx uses the official image; its responsibilities are serving static files and handling TLS and reverse-proxy routing, not building frontend assets.
+- The `migration` container owns database initialization: it creates the three schemas and one database user per service, each allowed only its own schema.
 - Services wait for Postgres to be healthy (Compose `healthcheck` + `depends_on: condition: service_healthy`).
 - The backend `Dockerfile` is **multi-stage**: stage 1 compiles the Go program, stage 2 copies only the binary into a tiny image.
 - Avatar uploads (standard user management module) are stored in a named volume owned by Identity, with type and size validation.
@@ -922,6 +935,7 @@ Code to be ready to explain:
 | ____ | Backend: Go + Gin (replaces NestJS) | Team choice | All |
 | ____ | Split: 2 frontend, 2 backend | Parallel work | All |
 | ____ | 3 services (Identity, Content, Game) + Nginx as gateway | Achievable for a team of 4 | Backend pair |
+| 2026-11-09 | Frontend build and serving separation | One-shot frontend build container; official Nginx image serves built files | Team |
 | ____ | | | |
 
 ---
