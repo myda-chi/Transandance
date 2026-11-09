@@ -246,17 +246,16 @@ transcendence/
 │   │   ├── identity/            # Identity's own code (only used by cmd/identity)
 │   │   ├── content/             # Content's own code
 │   │   └── game/                # Game's own code (incl. websocket hub)
+│   ├── migration/               # dedicated migration container
+│   │   ├── Dockerfile
+│   │   ├── run_migrations.sh
+│   │   └── migrations/
+│   │       ├── identity/
+│   │       ├── content/
+│   │       ├── game/
+│   │       └── init/
 │   ├── seeds/                   # islands, levels, questions (JSON) + loader
 │   └── Dockerfile               # multi-stage; builds one service via a build arg
-│
-├── migration/                   # dedicated migration container
-│   ├── Dockerfile
-│   ├── run_migrations.sh
-│   └── migrations/
-│       ├── identity/
-│       ├── content/
-│       ├── game/
-│       └── init/
 │
 └── frontend/
     ├── package.json
@@ -434,7 +433,7 @@ erDiagram
 |---|---|---|
 | `users` | id (UUID), role, email (nullable), username (nullable), password_hash, display_name, status, created_at, updated_at | Parents: email unique, required. Children: username unique, required, no email |
 | `parent_child` | id, parent_user_id → users, child_user_id → users, created_at | Unique (parent, child). If one parent per child (D2): unique (child) too |
-| `friendships` | id, requester_id, addressee_id, status (`PENDING`/`ACCEPTED`/`DECLINED`), created_at, updated_at | One row per pair (store the smaller ID first, unique pair); no self-friendship |
+| `friendships` | id, requester_id, addressee_id, status (`PENDING`/`ACCEPTED`/`DECLINED`/`REMOVED`), created_at, updated_at | One row per pair (store the smaller ID first, unique pair); no self-friendship |
 | `culture_access` | child_user_id (PK) → users, allowed (bool), updated_by, updated_at | Whole-island on/off to start |
 | `refresh_tokens` | id, user_id, token_hash, expires_at, revoked_at | Store the hash, not the token |
 
