@@ -4,3 +4,11 @@
 
 /nginx/certs/*
 !/nginx/certs/README.md
+
+node_modules/
+**/node_modules/
+
+dist/
+**/dist/
+
+npm-debug.log*
