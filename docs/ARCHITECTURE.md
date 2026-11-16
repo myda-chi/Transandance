@@ -383,7 +383,6 @@ Questions are written as **JSON files** in `backend/seeds/`, reviewed in pull re
   "level": { "slug": "maths-1", "order": 1, "difficulty": 1 },
   "questions": [
     {
-      "type": "MULTIPLE_CHOICE",
       "prompt": { "en": "What is 5 + 3?", "fr": "Combien font 5 + 3 ?", "ar": "كم يساوي 5 + 3؟" },
       "options": [
         { "text": { "en": "6", "fr": "6", "ar": "6" }, "correct": false },
@@ -443,7 +442,7 @@ erDiagram
 |---|---|---|
 | `islands` | id, slug (`maths`/`vocabulary`/`culture`), display_order | Names come from translation keys |
 | `levels` | id, island_id → islands, slug, display_order, difficulty | Unique (island, display_order) |
-| `questions` | id, level_id → levels, type, difficulty, is_active | Language-independent part |
+| `questions` | id, level_id → levels, difficulty, is_active | Language-independent part; all questions use multiple-choice options |
 | `question_translations` | question_id, locale, prompt | Unique (question, locale) |
 | `answer_options` | id, question_id → questions, display_order, is_correct | **is_correct is never sent to the browser** |
 | `option_translations` | option_id, locale, text | Unique (option, locale) |
