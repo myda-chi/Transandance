@@ -1,0 +1,1 @@
+DROP TABLE game.session_players;
