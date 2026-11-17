@@ -57,7 +57,7 @@ Both modes use **one shared quiz engine**. Only the *rules* differ (section 10).
 
 1. **Parent onboarding:** register → log in → create a child (username + password) → set Culture Island access.
 2. **Solo play:** child logs in → sees the island map → starts a level → answers questions → server validates → progress saved → next level unlocks.
-3. **Friend challenge:** child invites a friend → friend accepts → both play the same questions live → server scores → winner shown → result saved in match history.
+3. **Friend challenge:** child creates a challenge and invites one or more friends → invitees respond individually → participants play the same questions live → server scores → results are saved in match history.
 4. **Parent view:** parent sees each child's progress and recent matches.
 
 ### Non-negotiable product rules
@@ -452,11 +452,12 @@ erDiagram
 | Table | Key columns | Notes |
 |---|---|---|
 | `quiz_sessions` | id, mode (`SOLO`/`CHALLENGE`), island_id, level_id, status (`ACTIVE`/`COMPLETED`/`ABANDONED`), started_at, completed_at | One engine for both modes |
-| `session_players` | session_id → quiz_sessions, player_user_id, score, result (`WIN`/`LOSS`/`DRAW`/null) | Solo = 1 row, challenge = 2 rows |
+| `session_players` | session_id → quiz_sessions, player_user_id, score, result (`WIN`/`LOSS`/`DRAW`/null) | Solo = 1 row; a challenge has one row per participant |
 | `answer_submissions` | id, session_id, player_user_id, question_id, selected_option_id, is_correct, response_time_ms, answered_at | Unique (session, player, question): blocks double answers |
 | `level_progress` | player_user_id, level_id, status (`LOCKED`/`UNLOCKED`/`COMPLETED`), best_score, attempt_count, completed_at | The authoritative progress |
-| `challenges` | id, challenger_id, opponent_id, level_id, status (`PENDING`/`ACCEPTED`/`DECLINED`/`EXPIRED`), created_at, expires_at | Invitations |
-| `matches` | id, challenge_id → challenges, session_id → quiz_sessions, status, started_at, completed_at | The durable record of a live match; scores live in `session_players` (stored once) |
+| `challenges` | id, challenger_id, level_id, status, created_at, expires_at | One record for the whole challenge, independent of how many friends are invited |
+| `challenge_invites` | id, challenge_id → challenges, invitee_user_id, status, created_at, responded_at | One record per invitee; stores that user's decision and response time |
+| `matches` | id, challenge_id → challenges, session_id → quiz_sessions, status, started_at, completed_at | The durable record of a live match; participant scores live in `session_players` (stored once) |
 
 ---
 
@@ -499,7 +500,7 @@ erDiagram
 | `GET /api/game/progress` | Game | child | Own progress, unlocked levels |
 | `GET /api/game/children/{id}/progress` | Game | parent (own) | Parent view |
 | `GET /api/game/matches` | Game | child / parent | Match history |
-| `POST /api/game/challenges` · `PATCH /challenges/{id}` | Game | child | Invite / accept / decline |
+| `POST /api/game/challenges` · `PATCH /api/game/challenges/{challengeId}/invites/{inviteId}` | Game | child | Create a challenge with invitees / accept or decline an individual invite |
 
 Safe question payload (what the browser receives):
 
@@ -514,13 +515,13 @@ Connection: `wss://localhost/ws` (Nginx → Game). The client authenticates duri
 
 | Type | Direction | Payload | When |
 |---|---|---|---|
-| `challenge.received` | server → client | challengeId, from | A friend invites you |
+| `challenge.received` | server → client | challengeId, inviteId, from | An invitee receives an invitation |
 | `match.join` | client → server | matchId | Player enters the match screen |
-| `match.ready` | server → clients | players | Both connected |
+| `match.ready` | server → clients | players | Challenge participants are connected |
 | `match.question` | server → clients | index, safe question, deadline | Each round |
 | `match.answer` | client → server | questionId, optionId | Player answers |
 | `match.score` | server → clients | scores | After each round |
-| `match.opponent_disconnected` | server → client | graceSeconds | Opponent dropped |
+| `match.opponent_disconnected` | server → clients | playerId, graceSeconds | A participant dropped |
 | `match.resumed` | server → clients | full current state | Reconnected within grace period |
 | `match.end` | server → clients | final scores, winner, reason | Finished, forfeit, or timeout |
 | `error` | server → client | code, message | Invalid message |
@@ -529,11 +530,11 @@ Connection: `wss://localhost/ws` (Nginx → Game). The client authenticates duri
 **Match lifecycle (state machine):**
 
 ```
-PENDING ──accept──▶ WAITING_FOR_PLAYERS ──both joined──▶ IN_PROGRESS ──last round──▶ COMPLETED
-   │                        │                                 │
- decline/expire        timeout                      player gone > grace period
-   ▼                        ▼                                 ▼
-DECLINED / EXPIRED      CANCELLED                     COMPLETED (forfeit)
+PENDING ──invite accepted──▶ WAITING_FOR_PLAYERS ──required players joined──▶ IN_PROGRESS ──last round──▶ COMPLETED
+   │                                  │                                         │
+ expire/cancel                   timeout                         participant gone > grace period
+   ▼                                  ▼                                         ▼
+EXPIRED / CANCELLED              CANCELLED                              COMPLETED (forfeit)
 ```
 
 The **server** measures response times and decides points and the winner. A client that sends a score is ignored.
@@ -608,13 +609,13 @@ These need team decisions (section 15). Defaults to start with:
 
 ### 10.2 Friend challenge
 
-- Only between **friends** (D4), on a level both can access.
-- Both players get the **same questions in the same order**.
+- Only between **friends** (D4); the challenger and every invitee must be able to access the level.
+- All match participants get the **same questions in the same order**.
 - Each round has a time limit (start with 15 seconds).
 - **Points:** 0 for a wrong answer; for a correct answer, for example `100 + bonus for speed` measured **by the server** (formula decided by the team, D8).
 - **Ties:** a draw (or a tie-break rule decided in D8).
-- **Disconnect:** the opponent sees "reconnecting", there is a grace period (start with 20 seconds), then a forfeit win.
-- The result is saved once, by the Game service, and appears in both players' match history.
+- **Disconnect:** the other participants see "reconnecting", there is a grace period (start with 20 seconds), then the disconnected participant forfeits.
+- The result is saved once, by the Game service, and appears in all participants' match histories.
 
 ---
 
