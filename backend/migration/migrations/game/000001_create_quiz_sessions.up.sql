@@ -11,5 +11,12 @@ CREATE TABLE game.quiz_sessions (
         CHECK (mode IN ('SOLO', 'CHALLENGE')),
 
     CONSTRAINT quiz_sessions_status_check
-        CHECK (status IN ('ACTIVE', 'COMPLETED', 'ABANDONED'))
+        CHECK (status IN ('ACTIVE', 'COMPLETED', 'ABANDONED')),
+
+     -- Completed sessions must have a completion timestamp.
+    CONSTRAINT quiz_sessions_completed_at_check
+        CHECK (
+            status <> 'COMPLETED'
+            OR completed_at IS NOT NULL
+        )
 );

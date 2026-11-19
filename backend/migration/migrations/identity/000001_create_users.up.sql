@@ -38,6 +38,7 @@ CREATE TABLE identity.users (
             OR
             (
                 status = 'INACTIVE'
+                AND deactivation_source IS NOT NULL
                 AND deactivation_source IN (
                     'SELF',
                     'PARENT',

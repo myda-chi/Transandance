@@ -13,7 +13,11 @@ CREATE TABLE game.challenges (
             'COMPLETED',
             'CANCELLED',
             'EXPIRED'
-        ))
+        )),
+
+    -- A challenge cannot expire before it is created.
+    CONSTRAINT challenges_expiration_check
+        CHECK (expires_at >= created_at)
 );
 
 CREATE INDEX challenges_challenger_id_idx
