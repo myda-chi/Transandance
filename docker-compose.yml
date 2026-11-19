@@ -25,10 +25,16 @@ services:
       retries: 5
       start_period: 10s
 
+  # ================================================
+  # DATABASE MIGRATIONS
+  # ================================================
   migration:
     build:
       context: .
       dockerfile: backend/migration/Dockerfile
+
+    container_name: transcendence-migration
+    restart: "no"
 
     depends_on:
       postgres:
@@ -37,14 +43,26 @@ services:
     environment:
       DB_HOST: postgres
       DB_PORT: 5432
-      DB_NAME: ${POSTGRES_DB}
 
-      DB_ADMIN_USER: ${POSTGRES_USER}
-      DB_ADMIN_PASSWORD: ${POSTGRES_PASSWORD}
+      # PostgreSQL administrator
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
 
-      IDENTITY_DB_URL: ${IDENTITY_DB_URL}
-      CONTENT_DB_URL: ${CONTENT_DB_URL}
-      GAME_DB_URL: ${GAME_DB_URL}
+      # Identity
+      IDENTITY_DB_USER: ${IDENTITY_DB_USER}
+      IDENTITY_DB_PASSWORD: ${IDENTITY_DB_PASSWORD}
+      IDENTITY_DB_SCHEMA: ${IDENTITY_DB_SCHEMA}
+
+      # Content
+      CONTENT_DB_USER: ${CONTENT_DB_USER}
+      CONTENT_DB_PASSWORD: ${CONTENT_DB_PASSWORD}
+      CONTENT_DB_SCHEMA: ${CONTENT_DB_SCHEMA}
+
+      # Game
+      GAME_DB_USER: ${GAME_DB_USER}
+      GAME_DB_PASSWORD: ${GAME_DB_PASSWORD}
+      GAME_DB_SCHEMA: ${GAME_DB_SCHEMA}
 
     networks:
       - database
